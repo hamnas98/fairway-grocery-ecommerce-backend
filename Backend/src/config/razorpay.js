@@ -1,9 +1,13 @@
-const Razorpay = require('razorpay');
-const env = require('dotenv').config();
+import Razorpay from "razorpay";
+import logger from "../utils/logger.js";
 
-const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET
+if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+  throw new Error("❌ Razorpay keys missing in .env file");
+}
+
+export const razorpayInstance = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
-module.exports = razorpay;
+logger.info("🔑 Razorpay initialized successfully");
