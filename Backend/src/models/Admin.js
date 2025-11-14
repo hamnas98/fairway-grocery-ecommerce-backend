@@ -3,27 +3,21 @@ import bcrypt from "bcryptjs";
 
 const adminSchema = new mongoose.Schema(
   {
-    name: {
-      type: String,
-      required: [true, "Name is required"],
-      trim: true,
-      minlength: 2,
-    },
+    name: { type: String, required: true },
 
     email: {
       type: String,
-      required: [true, "Email is required"],
+      required: true,
       unique: true,
       lowercase: true,
-      trim: true,
-      match: [/^\S+@\S+\.\S+$/, "Please provide a valid email"],
+      match: [/^\S+@\S+\.\S+$/, "Invalid email"],
     },
 
     password: {
       type: String,
       required: true,
       minlength: 8,
-      select: false, // hide password
+      select: false,
     },
 
     role: {
@@ -36,37 +30,21 @@ const adminSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
-
-    lastLogin: {
-      type: Date,
-      default: null,
-    },
   },
   { timestamps: true }
 );
 
-// Index for fast login lookup
-adminSchema.index({ email: 1 });
-
-// Hash password before saving
+// Hash password
 adminSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
-
-  this.password = await bcrypt.hash(this.password, 12); // stronger hash
+  this.password = await bcrypt.hash(this.password, 12);
   next();
 });
 
-// Compare password method
-adminSchema.methods.comparePassword = async function (candidatePassword) {
-  return bcrypt.compare(candidatePassword, this.password);
+// Compare password
+adminSchema.methods.comparePassword = async function (candidate) {
+  return bcrypt.compare(candidate, this.password);
 };
 
-// Hide sensitive fields from JSON output
-adminSchema.methods.toJSON = function () {
-  const admin = this.toObject();
-  delete admin.password;
-  return admin;
-};
-
-const Admin = mongoose.model("Admin", adminSchema);
-export default Admin;
+export default mongoose.model("Admin", adminSchema);
+ad
