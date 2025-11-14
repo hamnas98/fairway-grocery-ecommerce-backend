@@ -1,5 +1,6 @@
 //package
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
 
 //files
 import app from './app.js';
@@ -23,10 +24,19 @@ const PORT = process.env.PORT || 5000;
             logger.info(`Server running on port ${PORT} (${process.env.NODE_ENV})`);
         });
 
-        //promise no catch
+        const gracefulShutdown = async () => {
+            logger.info('🔻 Gracefully shutting down...');
+            server.close(async () => {
+                await mongoose.connection.close();
+                logger.info('MongoDB disconnected');
+                process.exit(0);
+            });
+        };
+
+        // Handle unhandled promise rejections
         process.on('unhandledRejection', (err) => {
             logger.error('UNHANDLED REJECTION 💥', err);
-            server.close(() => process.exit(1))
+            gracefulShutdown();
         });
 
         //sychronous exception without try/catch
@@ -35,11 +45,18 @@ const PORT = process.env.PORT || 5000;
             process.exit(1);
         });
 
-        // signals from ec2 / pm2
+        // signals from ec2 / pm2 - shutdown gracefully
         process.on('SIGTERM', () => {
             logger.info('SIGTERM received — shutting down gracefully…');
-            server.close(() => logger.info('Process terminated'));
+            gracefulShutdown();
         });
+
+        // server exit using ctr+c development
+        process.on('SIGINT', () => {
+            logger.info('SIGINT received — shutting down…');
+            gracefulShutdown();
+        });
+
 
     } catch (error) {
         logger.error('SERVER STARTUP FAILED', err);
