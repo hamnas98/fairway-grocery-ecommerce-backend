@@ -1,89 +1,104 @@
+// packages
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
+import cookieParser from 'cookie-parser';
+import mongoSanitize from 'express-mongo-sanitize';
+import morgan from 'morgan';
+import dotenv from 'dotenv';
+import responseTime from 'response-time';
+app.use(responseTime());
+
+//files
+
+// // Import routes
+// import routes from './routes/index.js';
+
+// // Import middlewares
+// import { errorHandler } from './middlewares/error.middleware.js';
+// import { notFound } from './middlewares/notFound.middleware.js';
+// import { rateLimiter } from './middlewares/rateLimiter.middleware.js';
+
+// // Import logger
+// import logger from './utils/logger.js';
 
 
-
+// Load env variables
+dotenv.config();
 
 const app = express();
 
-// Middleware
-app.use(express.json());
-app.use(express.urlencoded({extended: true}));
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(multerErrorHandler);
+// Trust proxy (important for rate limiting behind nginx/load balancer)
+app.set('trust proxy', 1);
 
-app.use(nocache());
-// Session configuration
-app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key',
-    resave: false,
-    saveUninitialized: false,
-    cookie: { 
-        maxAge: 72 * 60 * 60 * 1000 // 72 hours
-    }
+// Security middlewares 
+app.use(helmet({
+    crossOriginResourcePolicy: {policy:'cross-origin'}
 }));
 
-// Flash messages
-app.use(flash());
-app.use((req, res, next) => {
-    res.locals.success = req.flash('success');
-    res.locals.error = req.flash('error');
-    next();
-});
+// check response time
+app.use(responseTime());
 
-// View engine setup
-// app.js
-app.set('view engine', 'ejs');
-app.set('views', [
-    path.join(__dirname, 'views/admin'),
-    path.join(__dirname, 'views/user')
-]);
+// CORS configuration
+
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true, // Allow cookies
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+app.use(cors(corsOptions));
 
 
+// Body parsers
+app.use(express.json({limit: '10mb'}));
+app.use(express.urlencoded({extended: true, limit: '10mb'}));
+app.use(cookieParser());
+
+// Data sanitization against NoSQL query injection
+app.use(mongoSanitize());
+
+// Compression
+app.use(compression());
+
+// // Static files (if you want to serve admin panel assets)
+// app.use('/public', express.static(path.join(process.cwd(), 'public')));
 
 
-app.use(passport.initialize());
-app.use(passport.session());
 
-app.use('/admin', adminRoutes);
-
-
-app.use('/', userRoutes)
-
-
-app.use((req, res) => {
-    // Check if the request path starts with /admin
-    if (req.path.startsWith('/admin')) {
-        res.status(404).render('error', { 
-            error: 'Page not found',
-            admin: req.session.admin || null
-        });
-    } else {
-        res.status(404).render('error', { 
-            error: 'Page not found',
-            user: req.session.user || null
-        });
+// Logging morgen
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
+} else {
+  app.use(morgan('combined', {
+    stream: {
+      write: (message) => logger.info(message.trim())
     }
+  }));
+}
+
+// // Rate limiting (global)
+// app.use('/api/', rateLimiter);
+
+// check server Health check endpoint f
+app.get('/health', (req, res) => {
+    res.status(200).json({
+        success: true,
+        message : 'Server is Running',
+        timestamp: new Date().toISOString()
+    });
 });
 
 
-app.use((err, req, res, next) => {
-    console.error('Error:', err);
-    
-    const statusCode = err.statusCode || 500;
-    const errorMessage = process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong';
+// API routes
+app.use('/api', routes);
 
-    // Check if it's an admin route
-    if (req.path.startsWith('/admin')) {
-        res.status(statusCode).render('error', {
-            error: errorMessage,
-            admin: req.session.admin || null
-        });
-    } else {
-        res.status(statusCode).render('error', {
-            error: errorMessage,
-            user: req.session.user || null
-        });
-    }
-});
+// Handle 404
+app.use(notFound);
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Global error handler (must be last)
+app.use(errorHandler);
+
+export default app;
+

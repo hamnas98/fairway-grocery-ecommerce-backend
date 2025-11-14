@@ -1,12 +1,13 @@
 //package
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
+// import { error } from 'winston';
 
 //files
-import app from './app.js';
-import connectDB from './config/database.js';
-import logger from './utils/logger.js';
-import { error } from 'winston';
+// import app from './app.js';
+// import connectDB from './config/database.js';
+// import logger from './utils/logger.js';
+
 
 
 // Load environment variables
@@ -59,7 +60,7 @@ const PORT = process.env.PORT || 5000;
 
 
     } catch (error) {
-        logger.error('SERVER STARTUP FAILED', err);
+        logger.error('SERVER STARTUP FAILED', error);
         process.exit(1);
     }
 })();
